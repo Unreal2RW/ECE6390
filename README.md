@@ -1,12 +1,16 @@
-# ECE 6390 Astrodynamics Toolbox and HW1
+# ECE 6390 Course Code
 
-This repository contains a small Python astrodynamics toolbox based on the ECE 6390 lecture methods and the scripts used for Homework 1 on solar-radiation-pressure perturbations and ground-station look angles.
+This repository contains reusable course tools and homework implementations for ECE 6390.
 
-## Contents
+## Repository structure
 
-- `src/astrodynamics/`: course-based constants, two-body orbit formulas, ASD3 numerical propagation, solar-pressure perturbations, and ASD5 look-angle geometry.
-- `Homeworks/HW1/solve_hw1.py`: terminal entry point for the two homework calculations.
-- `Homeworks/HW1/hw1_helpers.py`: HW1-specific simulation, search, optimization, and plotting helpers.
+- `src/`: reusable toolbox code that can support multiple assignments and course topics.
+- `Homeworks/`: scripts and assignment-specific helpers organized by homework.
+
+## Current implementation
+
+- `src/astrodynamics/`: constants, two-body orbit calculations, numerical orbit propagation, perturbation models, and look-angle geometry.
+- `Homeworks/HW1/`: the Homework 1 solution and its supporting functions for solar-pressure perturbations and look-angle analysis.
 
 ## Requirements
 
@@ -15,7 +19,7 @@ This repository contains a small Python astrodynamics toolbox based on the ECE 6
 - Matplotlib
 - tqdm
 
-## Run
+## Run the current homework
 
 From the repository root:
 
@@ -23,6 +27,4 @@ From the repository root:
 python Homeworks/HW1/solve_hw1.py
 ```
 
-The integration step is configured through `DEFAULT_STEP_S` in `src/astrodynamics/propagation.py`. Phase 2 can use either the original coordinate search or the SciPy search by setting `DESIGN_METHOD` in `Homeworks/HW1/solve_hw1.py` to `"naive"` or `"scipy"`.
-
-The script prints progress and numerical results in the terminal. It also generates the density-versus-drift and optimized look-angle figures locally; generated artifacts are not stored in this repository.
+The script prints progress and numerical results in the terminal. Generated figures and other result artifacts are not stored in this repository.
