@@ -1,0 +1,14 @@
+*
+!README.md
+!.gitignore
+!src/
+src/*
+!src/astrodynamics/
+src/astrodynamics/*
+!src/astrodynamics/*.py
+!Homeworks/
+Homeworks/*
+!Homeworks/HW1/
+Homeworks/HW1/*
+!Homeworks/HW1/solve_hw1.py
+!Homeworks/HW1/hw1_helpers.py
