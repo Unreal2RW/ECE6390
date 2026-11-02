@@ -10,14 +10,27 @@ This repository contains reusable course tools and homework implementations for 
 ## Current implementation
 
 - `src/astrodynamics/`: constants, two-body orbit calculations, numerical orbit propagation, perturbation models, and look-angle geometry.
+- `src/antenna/`: position-vector array factors, element patterns, and directivity and gain calculations.
+- `src/rf/`: wavelength and power conversions, free-space loss, and Friis link budgets.
 - `Homeworks/HW1/`: the Homework 1 solution and its supporting functions for solar-pressure perturbations and look-angle analysis.
 
 ## Requirements
 
 - Python 3.10 or later
+- NumPy
 - SciPy
 - Matplotlib
 - tqdm
+
+The reusable modules use SI units and radians unless a function's documentation says otherwise. Array directivity is normalized by a numerical integral of the specified element and array power pattern over the sphere; angular sampling must resolve the pattern. Link budgets take total transmit-array power and directional linear gains.
+
+To make the toolbox importable from homework directories, install it from the repository root:
+
+```bash
+python -m pip install -e .
+```
+
+For example, reusable modules can then be imported as `src.astrodynamics.geometry`, `src.antenna.arrays`, `src.antenna.patterns`, and `src.rf.links`.
 
 ## Run the current homework
 
