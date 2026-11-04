@@ -9,7 +9,7 @@ directional_directivity: Normalize relative directional power by that integral.
 directional_gain: Apply a stated radiation efficiency to directivity.
 
 The normalization follows D = 4*pi*U / integral(U dOmega). Numerical midpoint
-integration in azimuth and cos(theta) evaluates the course's spherical integral;
+integration in azimuth and either cos(theta) or theta evaluates the spherical integral;
 it is an approximation whose angular sampling must resolve the pattern. Identical
 equally oriented element patterns and the ideal array-factor model are assumed.
 """
@@ -35,13 +35,15 @@ def field_to_power(array_factors, element_power=1.0):
     return np.abs(array_factors)**2 * element_power
 
 
-def integrate_array_power(positions_m, wavelength_m, weights=None, element_power_pattern=None, polar_samples=128, azimuth_samples=256, direction_chunk=256, element_chunk=256):
+def integrate_array_power(positions_m, wavelength_m, weights=None, element_power_pattern=None, polar_samples=128, azimuth_samples=256, direction_chunk=256, element_chunk=256, progress=None, polar_grid="cosine"):
     """Return integral(element_power(s)*|AF(s)|^2 dOmega) over the sphere.
 
     element_power_pattern is a vectorized callable accepting array-frame unit
     directions with shape (n, 3) and returning n relative power values. None
     means an isotropic full-sphere element. Choose even polar_samples for the
     ideal half-space boundary. Sampling resolution is independent of chunk size.
+    An optional progress object receives update(n) after each direction block.
+    The theta grid gives even angular resolution near a narrow main beam.
     """
     positions, weights = _prepare_array(positions_m, wavelength_m, weights)
     _check_chunks(direction_chunk, element_chunk)
@@ -52,9 +54,16 @@ def integrate_array_power(positions_m, wavelength_m, weights=None, element_power
     power_sum = 0.0
     for start in range(0, sample_count, direction_chunk):
         indices = np.arange(start, min(start + direction_chunk, sample_count))
-        cos_theta = -1.0 + 2.0 * (indices // azimuth_samples + 0.5) / polar_samples
+        if polar_grid == "theta":
+            theta = np.pi * (indices // azimuth_samples + 0.5) / polar_samples
+            cos_theta = np.cos(theta)
+            sin_theta = np.sin(theta)
+            angular_weight = sin_theta
+        else:
+            cos_theta = -1.0 + 2.0 * (indices // azimuth_samples + 0.5) / polar_samples
+            sin_theta = np.sqrt(1.0 - cos_theta**2)
+            angular_weight = 1.0
         phi = 2.0 * np.pi * (indices % azimuth_samples + 0.5) / azimuth_samples
-        sin_theta = np.sqrt(1.0 - cos_theta**2)
         directions = np.stack((sin_theta * np.cos(phi), sin_theta * np.sin(phi), cos_theta), axis=-1)
         af = _array_factor_block(positions, directions, wavenumber, weights, element_chunk)
         if element_power_pattern is None:
@@ -63,8 +72,10 @@ def integrate_array_power(positions_m, wavelength_m, weights=None, element_power
             element_power = np.asarray(element_power_pattern(directions), dtype=float)
             if element_power.shape not in ((), (len(directions),)) or np.any(~np.isfinite(element_power)) or np.any(element_power < 0):
                 raise ValueError("Element pattern must return a finite nonnegative scalar or one value per direction")
-        power_sum += np.sum(np.abs(af)**2 * element_power)
-    integral = float((4 * np.pi / sample_count) * power_sum)
+        power_sum += np.sum(np.abs(af)**2 * element_power * angular_weight)
+        if progress is not None:
+            progress.update(len(directions))
+    integral = float(((2 * np.pi**2 if polar_grid == "theta" else 4 * np.pi) / sample_count) * power_sum)
     if not np.isfinite(integral) or integral <= 0:
         raise ValueError("The integrated radiation pattern must be finite and positive")
     return integral

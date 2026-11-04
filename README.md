@@ -13,6 +13,7 @@ This repository contains reusable course tools and homework implementations for 
 - `src/antenna/`: position-vector array factors, element patterns, and directivity and gain calculations.
 - `src/rf/`: wavelength and power conversions, free-space loss, and Friis link budgets.
 - `Homeworks/HW1/`: the Homework 1 solution and its supporting functions for solar-pressure perturbations and look-angle analysis.
+- [`Homeworks/HW3/`](Homeworks/HW3/README.md): GEO antenna coverage design using a candidate ground ellipse, rectangular arrays, element thinning, and Friis received-power calculations.
 
 ## Requirements
 
@@ -32,7 +33,7 @@ python -m pip install -e .
 
 For example, reusable modules can then be imported as `src.astrodynamics.geometry`, `src.antenna.arrays`, `src.antenna.patterns`, and `src.rf.links`.
 
-## Run the current homework
+## Run the homework scripts
 
 From the repository root:
 
@@ -40,4 +41,10 @@ From the repository root:
 python Homeworks/HW1/solve_hw1.py
 ```
 
-The script prints progress and numerical results in the terminal. Generated figures and other result artifacts are not stored in this repository.
+For HW3, place the assignment's `GAmap.mat` in `Homeworks/HW3/`, then run:
+
+```bash
+python Homeworks/HW3/solve_hw3.py
+```
+
+The scripts print progress and numerical results and save their outputs beside the scripts. Assignment input data, course PDFs, and generated results are kept out of this repository. See the [HW3 instructions](Homeworks/HW3/README.md) for its input format, search settings, and output files.

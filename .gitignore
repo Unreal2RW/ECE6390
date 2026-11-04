@@ -19,3 +19,8 @@ Homeworks/*
 Homeworks/HW1/*
 !Homeworks/HW1/solve_hw1.py
 !Homeworks/HW1/hw1_helpers.py
+!Homeworks/HW3/
+Homeworks/HW3/*
+!Homeworks/HW3/README.md
+!Homeworks/HW3/solve_hw3.py
+!Homeworks/HW3/hw3_helpers.py

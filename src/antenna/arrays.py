@@ -56,15 +56,16 @@ def steering_phases(positions_m, direction, wavelength_m):
     direction = np.asarray(direction, dtype=float)
     if direction.shape != (3,) or not np.isclose(np.linalg.norm(direction), 1.0, rtol=1e-7, atol=1e-9):
         raise ValueError("Steering direction must be a finite three-component unit vector")
-    return -(2 * np.pi / wavelength_m) * (positions @ direction)
+    return -(2 * np.pi / wavelength_m) * np.einsum("ij,j->i", positions, direction, optimize=False)
 
 
-def array_factor(positions_m, directions, wavelength_m, weights=None, direction_chunk=256, element_chunk=256):
+def array_factor(positions_m, directions, wavelength_m, weights=None, direction_chunk=256, element_chunk=256, progress=None):
     """Return the complex AF with the same leading shape as directions.
 
     positions_m has shape (elements, 3), directions has shape (..., 3), and
     weights contains one complex excitation per element (ones by default).
     Both direction and element blocks are bounded, including for large grids.
+    An optional progress object receives update(n) after each direction block.
     """
     positions, weights = _prepare_array(positions_m, wavelength_m, weights)
     directions = np.asarray(directions, dtype=float)
@@ -79,6 +80,8 @@ def array_factor(positions_m, directions, wavelength_m, weights=None, direction_
     for start in range(0, len(flat_directions), direction_chunk):
         stop = start + direction_chunk
         result[start:stop] = _array_factor_block(positions, flat_directions[start:stop], 2 * np.pi / wavelength_m, weights, element_chunk)
+        if progress is not None:
+            progress.update(len(flat_directions[start:stop]))
     return result.reshape(directions.shape[:-1])
 
 
@@ -103,6 +106,7 @@ def _array_factor_block(positions, directions, wavenumber, weights, element_chun
     result = np.zeros(len(directions), dtype=complex)
     for start in range(0, len(positions), element_chunk):
         stop = start + element_chunk
-        phase = wavenumber * (directions @ positions[start:stop].T)
-        result += np.exp(1j * phase) @ weights[start:stop]
+        # Direct sums avoid the macOS BLAS floating-point warning issue.
+        phase = wavenumber * np.einsum("di,ei->de", directions, positions[start:stop], optimize=False)
+        result += np.einsum("de,e->d", np.exp(1j * phase), weights[start:stop], optimize=False)
     return result

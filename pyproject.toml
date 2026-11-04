@@ -7,7 +7,7 @@ name = "ece6390-toolbox"
 version = "0.1.0"
 description = "Course computation toolbox for ECE6390"
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.23"]
+dependencies = ["numpy>=1.23", "scipy", "matplotlib", "tqdm"]
 
 [tool.setuptools.packages.find]
 where = ["."]

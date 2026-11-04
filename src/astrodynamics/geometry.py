@@ -94,4 +94,4 @@ def project_to_array_frame(vectors_earth_fixed, frame_axes):
     frame = np.asarray(frame_axes, dtype=float)
     if vectors.shape[-1:] != (3,) or frame.shape != (3, 3):
         raise ValueError("Vectors need a final axis of three and frame_axes must be 3x3")
-    return vectors @ frame.T
+    return np.einsum("...j,ij->...i", vectors, frame, optimize=False)
