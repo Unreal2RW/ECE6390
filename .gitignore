@@ -2,5 +2,6 @@
 __pycache__/
 *.egg-info/
 *.mat
+!Homeworks/HW3/GAmap.mat
 *.pdf
 *.png

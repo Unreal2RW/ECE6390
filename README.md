@@ -13,7 +13,7 @@ This repository contains reusable course tools and homework implementations for 
 - `src/antenna/`: position-vector array factors, element patterns, and directivity and gain calculations.
 - `src/rf/`: wavelength and power conversions, free-space loss, and Friis link budgets.
 - `Homeworks/HW1/`: the Homework 1 solution and its supporting functions for solar-pressure perturbations and look-angle analysis.
-- `Homeworks/HW3/`: GEO antenna coverage design using a candidate ground ellipse, rectangular arrays, element thinning, and Friis received-power calculations.
+- `Homeworks/HW3/`: GEO antenna coverage design using a candidate ground ellipse, rectangular arrays, element thinning, and Friis received-power calculations. The included `GAmap.mat` contains the Georgia mask and corresponding longitude and latitude grids.
 
 ## Requirements
 
@@ -41,10 +41,10 @@ From the repository root:
 python Homeworks/HW1/solve_hw1.py
 ```
 
-For HW3, place the assignment's `GAmap.mat` in `Homeworks/HW3/`, then run:
+For HW3, use the included `Homeworks/HW3/GAmap.mat` and run:
 
 ```bash
 python Homeworks/HW3/solve_hw3.py
 ```
 
-The scripts print progress and numerical results and save their outputs beside the scripts. Assignment input data, course PDFs, and generated results are kept out of this repository.
+The scripts print progress and numerical results and save their outputs beside the scripts. Course PDFs and generated results are kept out of this repository.
