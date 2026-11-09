@@ -12,6 +12,7 @@ from matplotlib.colors import ListedColormap
 from matplotlib.lines import Line2D
 import numpy as np
 from scipy.io import loadmat
+from scipy.optimize import brentq
 from scipy.spatial import ConvexHull
 from tqdm import tqdm
 
@@ -27,7 +28,6 @@ RECEIVE_GAIN_DBI = 10.0
 RECEIVER_THRESHOLD_DBM = -80.0
 POLAR_SAMPLES = 720
 AZIMUTH_SAMPLES = 360
-LONGITUDE_STEP_DEG = 1.0
 SIZE_FACTORS = np.linspace(0.6, 1.4, 9)
 CORNER_CUT_FRACTIONS = (0.1, 0.2, 0.3, 0.4, 0.45)
 FRAME_WIDTH_FRACTIONS = (0.05, 0.1, 0.2, 0.3)
@@ -189,42 +189,65 @@ def target_coverage_ellipse(ground_map: GroundMap):
     axes = 1/np.sqrt(np.linalg.eigvalsh(matrix))
     center_lon = origin_lon + np.rad2deg(center[0]/(EARTH_RADIUS_M*np.cos(np.deg2rad(origin_lat))))
     center_lat = origin_lat + np.rad2deg(center[1]/EARTH_RADIUS_M)
-    return center_lat, center_lon, axes, ellipse
+    east_scale = np.cos(np.deg2rad(center_lat))/np.cos(np.deg2rad(origin_lat))
+    scale = np.array([east_scale, 1.0])
+    ground_shape = np.linalg.inv(matrix)*np.outer(scale, scale)
+    return center_lat, center_lon, axes, ellipse, ground_shape
+
+
+def ellipse_longitude(center_lat: float, center_lon: float, ground_shape: np.ndarray, longitude_limits: tuple[float, float]) -> float:
+    """Align the local ellipse with the array's east/south direction coordinates."""
+    latitude, longitude = np.deg2rad([center_lat, center_lon])
+    ground = earth_fixed_position(latitude, longitude, EARTH_RADIUS_M)
+    east = np.array([-np.sin(longitude), np.cos(longitude), 0.0])
+    north = np.array([-np.sin(latitude)*np.cos(longitude), -np.sin(latitude)*np.sin(longitude), np.cos(latitude)])
+    ground_axes = np.stack((east, north))
+
+    def cross_term(longitude_deg):
+        satellite = geo_position(np.deg2rad(longitude_deg), GEO_RADIUS_M)
+        direction, distance = satellite_to_ground(satellite, ground)
+        frame = nadir_array_frame(np.deg2rad(longitude_deg))
+        direction = project_to_array_frame(direction, frame)
+        local_axes = project_to_array_frame(ground_axes, frame)
+        range_gradient = np.einsum("ij,j->i", local_axes, direction, optimize=False)
+        mapping = (local_axes[:, :2].T - np.outer(direction[:2], range_gradient))/distance
+        angular_shape = np.einsum("ia,ab,jb->ij", mapping, ground_shape, mapping, optimize=False)
+        return float(angular_shape[0, 1])
+
+    return float(brentq(cross_term, longitude_limits[0], longitude_limits[1], xtol=1e-6))
 
 
 def search_rectangles(ground_map: GroundMap):
     """Map the ground target to a GEO beam, then compare rectangular grids."""
     inside = ground_map.georgia
-    center_lat, center_lon, _, ellipse = target_coverage_ellipse(ground_map)
+    center_lat, center_lon, _, ellipse, ground_shape = target_coverage_ellipse(ground_map)
     target_ground = earth_fixed_position(np.deg2rad(center_lat), np.deg2rad(center_lon), EARTH_RADIUS_M)
     ga_lat = np.deg2rad(ground_map.latitude_deg[inside])
     ga_lon = ground_map.longitude_deg[inside]
     visible_halfspan = np.rad2deg(np.arccos(EARTH_RADIUS_M/(GEO_RADIUS_M*np.cos(ga_lat))))
     longitude_limits = (float(np.max(ga_lon - visible_halfspan)), float(np.min(ga_lon + visible_halfspan)))
-    longitude_grid = np.arange(np.ceil(longitude_limits[0]/LONGITUDE_STEP_DEG)*LONGITUDE_STEP_DEG, longitude_limits[1], LONGITUDE_STEP_DEG)
-    longitudes = np.unique(np.append(longitude_grid, center_lon))
+    longitude_deg = ellipse_longitude(center_lat, center_lon, ground_shape, longitude_limits)
+    geometry = ground_geometry(ground_map, longitude_deg)
+    satellite = geo_position(np.deg2rad(longitude_deg), GEO_RADIUS_M)
+    center_direction, _ = satellite_to_ground(satellite, target_ground)
+    steer_direction = project_to_array_frame(center_direction, nadir_array_frame(np.deg2rad(longitude_deg)))
+    target_xy = geometry.directions_array[ellipse, :2]
+    width_deg = np.rad2deg(np.max(target_xy, axis=0) - np.min(target_xy, axis=0))
+    estimate = np.maximum(2, np.rint(102/width_deg).astype(int))
+    row_sizes = np.unique(np.maximum(2, np.rint(estimate[1]*SIZE_FACTORS).astype(int)))
+    column_sizes = np.unique(np.maximum(2, np.rint(estimate[0]*SIZE_FACTORS).astype(int)))
     candidates = []
-    grid_progress = tqdm(total=len(longitudes), desc="Rectangular search", unit="longitude")
-    for longitude_deg in longitudes:
-        geometry = ground_geometry(ground_map, float(longitude_deg))
-        satellite = geo_position(np.deg2rad(longitude_deg), GEO_RADIUS_M)
-        center_direction, _ = satellite_to_ground(satellite, target_ground)
-        steer_direction = project_to_array_frame(center_direction, nadir_array_frame(np.deg2rad(longitude_deg)))
-        target_xy = geometry.directions_array[ellipse, :2]
-        width_deg = np.rad2deg(np.max(target_xy, axis=0) - np.min(target_xy, axis=0))
-        estimate = np.maximum(2, np.rint(102/width_deg).astype(int))
-        row_sizes = np.unique(np.maximum(2, np.rint(estimate[1]*SIZE_FACTORS).astype(int)))
-        column_sizes = np.unique(np.maximum(2, np.rint(estimate[0]*SIZE_FACTORS).astype(int)))
-        for rows in row_sizes:
-            for columns in column_sizes:
-                shape = (int(rows), int(columns))
-                power = rectangular_power(geometry.directions_array, shape, steer_direction)
-                relative = power/geometry.ranges_m**2
-                weakest_ga = np.min(relative[inside])
-                outside_count = int(np.count_nonzero(~inside & geometry.visible & (relative > weakest_ga)))
-                score = (outside_count, rows*columns)
-                candidates.append((score, float(longitude_deg), geometry, shape, steer_direction, "full", 0.0))
-        grid_progress.update()
+    grid_progress = tqdm(total=len(row_sizes)*len(column_sizes), desc="Rectangular search", unit="array")
+    for rows in row_sizes:
+        for columns in column_sizes:
+            shape = (int(rows), int(columns))
+            power = rectangular_power(geometry.directions_array, shape, steer_direction)
+            relative = power/geometry.ranges_m**2
+            weakest_ga = np.min(relative[inside])
+            outside_count = int(np.count_nonzero(~inside & geometry.visible & (relative > weakest_ga)))
+            score = (outside_count, rows*columns)
+            candidates.append((score, longitude_deg, geometry, shape, steer_direction, "full", 0.0))
+            grid_progress.update()
     grid_progress.close()
     by_coverage = sorted(candidates, key=lambda item: item[0])[:5]
     by_count = sorted(candidates, key=lambda item: (item[0][1], item[0][0]))[:5]
@@ -265,7 +288,7 @@ def search_rectangles(ground_map: GroundMap):
     score, longitude_deg, geometry, shape, steer_direction, cut_kind, fraction = selected
     summary = (len(feasible), best_coverage[0], min(candidates, key=lambda item: (item[0][1], item[0][0]))[0])
     array = make_array(shape, steer_direction, cut_kind, row_stride=fraction[0], column_stride=fraction[1]) if cut_kind == "lattice" else make_array(shape, steer_direction, cut_kind, fraction)
-    return longitude_deg, geometry, array, ellipse, (center_lat, center_lon), score, summary, (longitude_limits, longitudes)
+    return longitude_deg, geometry, array, ellipse, (center_lat, center_lon), score, summary, longitude_limits
 
 
 def array_coverage(ground_map: GroundMap, geometry: GroundGeometry, array: ArrayDesign) -> CoverageResult:

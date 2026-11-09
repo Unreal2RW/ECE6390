@@ -32,10 +32,10 @@ def main():
 
     print("Phase 2: fit a candidate ellipse and compare rectangular arrays")
     phase_start = perf_counter()
-    satellite_longitude_deg, geometry, array, target_ellipse, ellipse_center, search_score, search_summary, longitude_search = search_rectangles(ground_map)
+    satellite_longitude_deg, geometry, array, target_ellipse, ellipse_center, search_score, search_summary, longitude_limits = search_rectangles(ground_map)
     print(f"  candidate -80 dBm ellipse center: {ellipse_center[0]:.4f} deg N, {ellipse_center[1]:.4f} deg E")
-    print(f"  GEO longitudes visible from all Georgia: {longitude_search[0][0]:.3f} to {longitude_search[0][1]:.3f} deg")
-    print(f"  searched {len(longitude_search[1])} longitudes in that interval at {LONGITUDE_STEP_DEG:g} deg spacing, plus the ellipse-center longitude")
+    print(f"  GEO longitudes visible from all Georgia: {longitude_limits[0]:.3f} to {longitude_limits[1]:.3f} deg")
+    print(f"  GEO longitude from ellipse geometry: {satellite_longitude_deg:.6f} deg")
     print(f"  candidate ground ellipse: {np.count_nonzero(target_ellipse & ~inside & geometry.visible)} outside pixels on the map")
     print(f"  selected rectangular grid: {array.active_mask.shape}, {array.cut_kind}; active elements: {search_score[1]}; outside pixels: {search_score[0]}")
     if array.cut_kind == "lattice":
